@@ -7,71 +7,94 @@ import deb from '@/assets/deb.jpg'
 import gab from '@/assets/gab.jpg'
 import marden from '@/assets/marden.jpg'
 
+// Define interfaces for better type safety
+interface User {
+  name: string
+  avatar: string
+}
+
 const isExpanded = ref(false)
-const selectedUser = ref<{ name: string; avatar: string } | null>(null)
-// Variable pour afficher l’icône Check
+const selectedUser = ref<User | null>(null)
 const showCheck = ref(false)
 
-const containerList = useTemplateRef('containerList')
-const downloadIcon = useTemplateRef('downloadIcon')
-const selectedAvatar = useTemplateRef('selectedAvatar')
-const borderCircle = useTemplateRef('borderCircle')
-const checkIcon = useTemplateRef('checkIcon')
+// Group refs for better organization
+const refs = {
+  containerList: useTemplateRef('containerList'),
+  downloadIcon: useTemplateRef('downloadIcon'),
+  selectedAvatar: useTemplateRef('selectedAvatar'),
+  borderCircle: useTemplateRef('borderCircle'),
+  checkIcon: useTemplateRef('checkIcon')
+}
+
+// Animation configurations for reusability
+const ANIMATION_CONFIG = {
+  spring: { type: 'spring' as const },
+  fade: { duration: 0.4 },
+  circle: {
+    radius: 55,
+    circumference: Math.PI * 2 * 55
+  }
+}
 
 const toggleExpand = async () => {
   if (!isExpanded.value) {
     isExpanded.value = true
     await nextTick()
-    if (containerList.value) {
-      animate(containerList.value, {
+
+    if (refs.containerList.value) {
+      await animate(refs.containerList.value, {
         height: 'auto',
         opacity: [0, 1],
         scale: [0.8, 1]
       }, {
         duration: 1,
-        type: 'spring'
+        ...ANIMATION_CONFIG.spring
       })
-    } else {
-      animate(containerList.value, {
+    }
+  } else {
+    if (refs.containerList.value) {
+      await animate(refs.containerList.value, {
         height: '0px',
         opacity: [1, 0],
         scale: [1, 0.9]
       }, {
         duration: 0.4,
-        type: 'spring'
+        ...ANIMATION_CONFIG.spring
       })
+      isExpanded.value = false
     }
   }
 }
 
-const selectUser = async (user: { name: string; avatar: string }) => {
-  if (containerList.value) {
-    await animate(containerList.value, {
+const selectUser = async (user: User) => {
+  // Close list animation
+  if (refs.containerList.value) {
+    await animate(refs.containerList.value, {
       height: 0,
       opacity: [1, 0],
       scale: [1, 0.8]
     }, {
       duration: 0.7,
-      type: 'spring'
+      ...ANIMATION_CONFIG.spring
     })
   }
 
-  if (downloadIcon.value) {
-    await animate(downloadIcon.value, {
+  // Hide download icon
+  if (refs.downloadIcon.value) {
+    await animate(refs.downloadIcon.value, {
       y: [0, -60],
       opacity: [1, 0],
       scale: [1, 0.8]
-    }, {
-      duration: 0.4
-    })
+    }, ANIMATION_CONFIG.fade)
   }
 
   await nextTick()
   isExpanded.value = false
   selectedUser.value = user
 
-  if (selectedAvatar.value) {
-    await animate(selectedAvatar.value, {
+  // Show selected avatar
+  if (refs.selectedAvatar.value) {
+    await animate(refs.selectedAvatar.value, {
       y: [40, 0],
       opacity: [0, 1],
       scale: 1
@@ -80,26 +103,24 @@ const selectUser = async (user: { name: string; avatar: string }) => {
     })
   }
 
-  // Animation du contour via le cercle SVG
-  if (borderCircle.value) {
-    // Définir une circonférence. Ici, pour un cercle de rayon 55 dans un SVG 120x120,
-    // la circonférence est approximativement 2 * PI * 55 ≈ 345.
-    const circumference = 345
-    borderCircle.value.style.strokeDasharray = circumference
-    borderCircle.value.style.strokeDashoffset = circumference
+  // Animate circle border
+  if (refs.borderCircle.value) {
+    const { circumference } = ANIMATION_CONFIG.circle
+    const element = refs.borderCircle.value as SVGCircleElement
+    element.style.strokeDasharray = `${circumference}`
+    element.style.strokeDashoffset = `${circumference}`
 
-    await animate(borderCircle.value, {
+    await animate(element, {
       strokeDashoffset: 0
     }, {
-      duration: 1,
-      easing: 'ease-in-out'
+      duration: 1
     })
   }
 
-  // Une fois le bord rempli, afficher l’icône Check
+  // Show check icon
   showCheck.value = true
-  if (checkIcon.value) {
-    await animate(checkIcon.value, {
+  if (refs.checkIcon.value) {
+    await animate(refs.checkIcon.value, {
       opacity: [0, 1],
       scale: [0.5, 1]
     }, {
@@ -107,9 +128,10 @@ const selectUser = async (user: { name: string; avatar: string }) => {
     })
   }
 
- await new Promise(resolve => setTimeout(resolve, 1000))
-  if (selectedAvatar.value && checkIcon.value) {
-    await animate([selectedAvatar.value, checkIcon.value], {
+  // Wait and hide everything
+  await new Promise(resolve => setTimeout(resolve, 1000))
+  if (refs.selectedAvatar.value && refs.checkIcon.value) {
+    await animate([refs.selectedAvatar.value, refs.checkIcon.value], {
       y: [0, 100],
       opacity: [1, 0]
     }, {
@@ -117,22 +139,21 @@ const selectUser = async (user: { name: string; avatar: string }) => {
     })
   }
 
-  // Réinitialisation de l’état
+  // Reset state
   selectedUser.value = null
   showCheck.value = false
 
-  if (downloadIcon.value) {
-    await animate(downloadIcon.value, {
+  // Show download icon again
+  if (refs.downloadIcon.value) {
+    await animate(refs.downloadIcon.value, {
       y: [-60, 0],
       opacity: [0, 1],
       scale: [0.8, 1]
-    }, {
-      duration: 0.4
-    })
+    }, ANIMATION_CONFIG.fade)
   }
 }
 
-const users = [
+const users: User[] = [
   { name: 'Elvin Code', avatar: elvin },
   { name: 'Gabriel Delattre', avatar: gab },
   { name: 'Deborah Yambenu', avatar: deb },
@@ -154,23 +175,26 @@ const users = [
           class="w-[70%] h-[70%] rounded-full object-cover"
           :alt="selectedUser.name"
         />
-        <!-- Contour SVG -->
-        <svg class="absolute top-0 left-0 w-full h-full" viewBox="0 0 120 120">
+        <svg
+          class="absolute top-0 left-0 w-full h-full"
+          viewBox="0 0 120 120"
+          aria-hidden="true"
+        >
           <circle
             ref="borderCircle"
             cx="60"
             cy="60"
-            r="55"
+            :r="ANIMATION_CONFIG.circle.radius"
             fill="none"
             stroke="#4caf50"
             stroke-width="5"
           />
         </svg>
-        <!-- Icône Check -->
         <div
           v-if="showCheck"
           ref="checkIcon"
           class="absolute inset-0 flex items-center justify-center"
+          aria-label="Selection confirmed"
         >
           <Check class="w-6 h-6 text-green-500" />
         </div>
@@ -181,18 +205,20 @@ const users = [
         v-if="isExpanded"
         ref="containerList"
         class="user-list p-2 bg-gray-100 space-y-2 rounded-2xl absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 min-w-[17rem] shadow-lg"
+        role="listbox"
       >
         <li
           v-for="user in users"
           :key="user.name"
           @click="selectUser(user)"
           class="flex gap-3 items-center cursor-pointer hover:bg-white/50 p-2 rounded-lg transition-colors"
+          role="option"
         >
           <div>
             <img
               :src="user.avatar"
               class="w-8 h-8 rounded-full"
-              :alt="user.name"
+              :alt="`Avatar of ${user.name}`"
             />
           </div>
           <div>
